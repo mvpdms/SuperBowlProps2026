@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { Trophy, Download, Lock, Users } from "lucide-react";
+import { sections } from "@/lib/questions";
+import { Trophy, Download, Lock, Users, ChevronLeft } from "lucide-react";
 
 export default function AdminPage() {
   const [password, setPassword] = useState("");
@@ -31,21 +32,33 @@ export default function AdminPage() {
   const exportCSV = () => {
     if (data.length === 0) return;
     
-    // Create CSV header from all question IDs (1-32) + basic info
-    const headers = ["Name", "MVP", "Submitted At", ...Array.from({length: 32}, (_, i) => `Q${i+1}`)].join(",");
+    // Flatten all questions for easier iteration
+    const allQuestions = sections.flatMap(s => s.questions);
     
-    const rows = data.map(row => {
-      const answers = typeof row.answers === 'string' ? JSON.parse(row.answers) : row.answers;
-      const qAnswers = Array.from({length: 32}, (_, i) => `"${answers[i+1] || ""}"`);
-      return [`"${row.name}"`, `"${row.mvp}"`, `"${new Date(row.created_at).toLocaleString()}"`, ...qAnswers].join(",");
+    // Header Row: "Question", then each person's name
+    const headerRow = ["Question", ...data.map(d => `"${d.name}"`)].join(",");
+    
+    // Data Rows for each question (1-32)
+    const questionRows = allQuestions.map(q => {
+      const answers = data.map(row => {
+        const userAnswers = typeof row.answers === 'string' ? JSON.parse(row.answers) : row.answers;
+        return `"${userAnswers[q.id] || ""}"`;
+      });
+      return [`"Q${q.id}: ${q.text}"`, ...answers].join(",");
     });
 
-    const csvContent = [headers, ...rows].join("\n");
+    // Special row for Tiebreaker MVP
+    const mvpRow = ["\"TIEBREAKER: MVP Pick\"", ...data.map(d => `"${d.mvp || ""}"`)].join(",");
+
+    // Special row for Timestamp (optional but helpful)
+    const timeRow = ["\"Submitted At\"", ...data.map(d => `"${new Date(d.created_at).toLocaleString()}"`)].join(",");
+
+    const csvContent = [headerRow, ...questionRows, mvpRow, timeRow].join("\n");
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement("a");
     const url = URL.createObjectURL(blob);
     link.setAttribute("href", url);
-    link.setAttribute("download", "superbowl_submissions.csv");
+    link.setAttribute("download", "superbowl_grader_sheet.csv");
     link.style.visibility = 'hidden';
     document.body.appendChild(link);
     link.click();
@@ -79,6 +92,9 @@ export default function AdminPage() {
               {loading ? "AUTHENTICATING..." : "UNLOCK DASHBOARD"}
             </button>
           </form>
+          <a href="/" className="flex items-center justify-center gap-2 text-gray-500 text-xs hover:text-white transition-colors">
+            <ChevronLeft className="w-3 h-3" /> Back to Form
+          </a>
         </div>
       </div>
     );
@@ -95,13 +111,18 @@ export default function AdminPage() {
           <h1 className="text-4xl font-black text-white italic">SUBMISSION OVERVIEW</h1>
           <p className="text-gray-500">Total Entries: <span className="text-white font-bold">{data.length}</span></p>
         </div>
-        <button 
-          onClick={exportCSV}
-          className="flex items-center gap-2 px-6 py-3 bg-[#1a1a20] border border-[#2c2c2c] rounded-xl hover:border-[#00d4ff] transition-all font-bold"
-        >
-          <Download className="w-4 h-4" />
-          EXPORT TO EXCEL
-        </button>
+        <div className="flex gap-3">
+          <a href="/" className="flex items-center gap-2 px-6 py-3 bg-[#1a1a20] border border-[#2c2c2c] rounded-xl hover:border-gray-500 transition-all font-bold text-sm">
+            BACK TO FORM
+          </a>
+          <button 
+            onClick={exportCSV}
+            className="flex items-center gap-2 px-6 py-3 bg-[#00d4ff] text-black border border-[#00d4ff] rounded-xl hover:scale-105 transition-all font-bold"
+          >
+            <Download className="w-4 h-4" />
+            EXPORT GRADER SHEET
+          </button>
+        </div>
       </div>
 
       <div className="bg-[#121216] border border-[#22222a] rounded-2xl overflow-hidden shadow-xl">
@@ -130,6 +151,13 @@ export default function AdminPage() {
                   </td>
                 </tr>
               ))}
+              {data.length === 0 && (
+                <tr>
+                  <td colSpan={4} className="px-6 py-20 text-center text-gray-500 italic">
+                    No entries yet. Share the link to get started!
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
