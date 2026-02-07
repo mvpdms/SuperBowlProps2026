@@ -2,19 +2,20 @@
 
 import { useState } from "react";
 import { sections } from "@/lib/questions";
-import { Trophy, CheckCircle2, Send } from "lucide-react";
+import { Trophy, CheckCircle2, Send, Loader2 } from "lucide-react";
 
 export default function PropSheet() {
   const [name, setName] = useState("");
   const [answers, setAnswers] = useState<Record<number, string>>({});
   const [mvp, setMvp] = useState("");
   const [submitted, setSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
   const handleOptionChange = (qId: number, value: string) => {
     setAnswers((prev) => ({ ...prev, [qId]: value }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name) {
       alert("Please enter your name");
@@ -24,12 +25,27 @@ export default function PropSheet() {
       alert("Please answer all 32 questions");
       return;
     }
-    
-    // For now, we simulate submission. 
-    // In a real app, this would POST to /api/submit
-    console.log("Submitting:", { name, answers, mvp });
-    setSubmitted(true);
-    window.scrollTo({ top: 0, behavior: "smooth" });
+
+    setSubmitting(true);
+
+    try {
+      const response = await fetch("/api/submit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, answers, mvp }),
+      });
+
+      if (response.ok) {
+        setSubmitted(true);
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      } else {
+        throw new Error("Failed to submit");
+      }
+    } catch (error) {
+      alert("There was an error saving your entry. Please try again.");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   if (submitted) {
@@ -50,31 +66,29 @@ export default function PropSheet() {
 
   return (
     <div className="space-y-12">
-      {/* Header */}
       <div className="text-center space-y-4">
         <div className="inline-flex items-center gap-3 px-4 py-1.5 bg-[#1a1a20] border border-[#2c2c2c] rounded-full text-[#00d4ff] text-sm font-bold tracking-wider">
           <Trophy className="w-4 h-4" />
           SUPER BOWL LX PROPS
         </div>
-        <h1 className="text-5xl font-extrabold tracking-tight text-white italic">GAME DAY CHALLENGE</h1>
+        <h1 className="text-5xl font-extrabold tracking-tight text-white italic text-shadow-xl">GAME DAY CHALLENGE</h1>
         <p className="text-gray-500">Fill out the prop sheet below for a chance to win the pool.</p>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-10">
-        {/* Name Input */}
-        <div className="bg-[#121216] border border-[#22222a] p-8 rounded-2xl shadow-xl space-y-4">
+        <div className="bg-[#121216] border border-[#22222a] p-8 rounded-2xl shadow-xl space-y-4 glow-shadow">
           <label className="block text-sm font-bold text-[#888888] uppercase tracking-widest">Your Name</label>
           <input 
             type="text"
             required
             value={name}
+            disabled={submitting}
             onChange={(e) => setName(e.target.value)}
             placeholder="Enter full name..."
-            className="w-full bg-[#0b0b0e] border border-[#2c2c2c] rounded-xl px-6 py-4 text-xl text-white focus:border-[#00d4ff] transition-all"
+            className="w-full bg-[#0b0b0e] border border-[#2c2c2c] rounded-xl px-6 py-4 text-xl text-white focus:border-[#00d4ff] transition-all disabled:opacity-50"
           />
         </div>
 
-        {/* Sections */}
         {sections.map((section) => (
           <div key={section.title} className="space-y-6">
             <h2 className="text-2xl font-black text-[#00d4ff] flex items-center gap-4">
@@ -95,12 +109,13 @@ export default function PropSheet() {
                       <button
                         key={opt}
                         type="button"
+                        disabled={submitting}
                         onClick={() => handleOptionChange(q.id, opt)}
                         className={`px-5 py-2.5 rounded-lg text-sm font-bold border transition-all ${
                           answers[q.id] === opt 
                             ? "bg-[#00d4ff] border-[#00d4ff] text-black shadow-[0_0_15px_rgba(0,212,255,0.3)]" 
                             : "bg-[#0b0b0e] border-[#2c2c2c] text-gray-400 hover:border-[#444444]"
-                        }`}
+                        } disabled:opacity-50`}
                       >
                         {opt}
                       </button>
@@ -112,7 +127,6 @@ export default function PropSheet() {
           </div>
         ))}
 
-        {/* Tiebreaker */}
         <div className="bg-[#121216] border border-[#00d4ff]/30 p-8 rounded-2xl shadow-xl space-y-6 relative overflow-hidden">
           <div className="absolute top-0 right-0 p-4 opacity-5">
             <Trophy className="w-32 h-32" />
@@ -124,23 +138,27 @@ export default function PropSheet() {
           <input 
             type="text"
             value={mvp}
+            disabled={submitting}
             onChange={(e) => setMvp(e.target.value)}
             placeholder="MVP Name..."
-            className="w-full bg-[#0b0b0e] border border-[#2c2c2c] rounded-xl px-6 py-4 text-white focus:border-[#00d4ff] transition-all"
+            className="w-full bg-[#0b0b0e] border border-[#2c2c2c] rounded-xl px-6 py-4 text-white focus:border-[#00d4ff] transition-all disabled:opacity-50"
           />
         </div>
 
-        {/* Submit */}
         <button 
           type="submit"
-          className="w-full bg-gradient-to-r from-[#00d4ff] to-[#008f5d] text-black text-xl font-black py-6 rounded-2xl flex items-center justify-center gap-3 hover:scale-[1.02] active:scale-95 transition-all shadow-2xl shadow-[#00d4ff]/20"
+          disabled={submitting}
+          className="w-full bg-gradient-to-r from-[#00d4ff] to-[#008f5d] text-black text-xl font-black py-6 rounded-2xl flex items-center justify-center gap-3 hover:scale-[1.02] active:scale-95 transition-all shadow-2xl shadow-[#00d4ff]/20 disabled:opacity-50"
         >
-          <Send className="w-6 h-6" />
-          SUBMIT OFFICIAL ENTRY
+          {submitting ? (
+            <Loader2 className="w-6 h-6 animate-spin" />
+          ) : (
+            <Send className="w-6 h-6" />
+          )}
+          {submitting ? "SUBMITTING..." : "SUBMIT OFFICIAL ENTRY"}
         </button>
       </form>
 
-      {/* Footer */}
       <footer className="text-center py-10 opacity-30 text-xs tracking-[0.2em] font-bold">
         SUPER BOWL LX • ARIZONA • 2026
       </footer>
