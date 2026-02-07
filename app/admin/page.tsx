@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { sections } from "@/lib/questions";
-import { Trophy, Download, Lock, Users, ChevronLeft } from "lucide-react";
+import { Trophy, Download, Lock, Users, ChevronLeft, RefreshCw } from "lucide-react";
 
 export default function AdminPage() {
   const [password, setPassword] = useState("");
@@ -10,17 +10,19 @@ export default function AdminPage() {
   const [data, setData] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const fetchData = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/submissions?password=${password}`);
+      // Added cache: 'no-store' and a timestamp to bust any browser/edge cache
+      const res = await fetch(`/api/submissions?password=${password}&t=${Date.now()}`, {
+        cache: 'no-store'
+      });
       if (res.ok) {
         const json = await res.json();
         setData(json);
         setIsLoggedIn(true);
       } else {
-        alert("Incorrect Admin Password");
+        alert("Incorrect Admin Password or Session Expired");
       }
     } catch (err) {
       alert("Error connecting to server");
@@ -29,16 +31,15 @@ export default function AdminPage() {
     }
   };
 
+  const handleLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    fetchData();
+  };
+
   const exportCSV = () => {
     if (data.length === 0) return;
-    
-    // Flatten all questions for easier iteration
     const allQuestions = sections.flatMap(s => s.questions);
-    
-    // Header Row: "Question", then each person's name
     const headerRow = ["Question", ...data.map(d => `"${d.name}"`)].join(",");
-    
-    // Data Rows for each question (1-32)
     const questionRows = allQuestions.map(q => {
       const answers = data.map(row => {
         const userAnswers = typeof row.answers === 'string' ? JSON.parse(row.answers) : row.answers;
@@ -46,23 +47,15 @@ export default function AdminPage() {
       });
       return [`"Q${q.id}: ${q.text}"`, ...answers].join(",");
     });
-
-    // Special row for Tiebreaker MVP
     const mvpRow = ["\"TIEBREAKER: MVP Pick\"", ...data.map(d => `"${d.mvp || ""}"`)].join(",");
-
-    // Special row for Timestamp (optional but helpful)
     const timeRow = ["\"Submitted At\"", ...data.map(d => `"${new Date(d.created_at).toLocaleString()}"`)].join(",");
-
     const csvContent = [headerRow, ...questionRows, mvpRow, timeRow].join("\n");
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement("a");
     const url = URL.createObjectURL(blob);
     link.setAttribute("href", url);
     link.setAttribute("download", "superbowl_grader_sheet.csv");
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
     link.click();
-    document.body.removeChild(link);
   };
 
   if (!isLoggedIn) {
@@ -112,9 +105,14 @@ export default function AdminPage() {
           <p className="text-gray-500">Total Entries: <span className="text-white font-bold">{data.length}</span></p>
         </div>
         <div className="flex gap-3">
-          <a href="/" className="flex items-center gap-2 px-6 py-3 bg-[#1a1a20] border border-[#2c2c2c] rounded-xl hover:border-gray-500 transition-all font-bold text-sm">
-            BACK TO FORM
-          </a>
+          <button 
+            onClick={fetchData}
+            disabled={loading}
+            className="flex items-center gap-2 px-6 py-3 bg-[#1a1a20] border border-[#2c2c2c] rounded-xl hover:border-white transition-all font-bold text-sm"
+          >
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+            REFRESH
+          </button>
           <button 
             onClick={exportCSV}
             className="flex items-center gap-2 px-6 py-3 bg-[#00d4ff] text-black border border-[#00d4ff] rounded-xl hover:scale-105 transition-all font-bold"
